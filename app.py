@@ -138,6 +138,7 @@ def generate_frames():
     global latest_frame # Declare it's using the global frame
     while True:
         if latest_frame is not None:
+            print("latest_frame:", latest_frame)  # In latest_frame trước khi mã hóa
             ret, jpeg = cv2.imencode('.jpg', latest_frame)
             if not ret:
                 print("cv2.imencode failed")  # Kiểm tra xem mã hóa có thành công không
@@ -163,14 +164,14 @@ def bus_call(bus, message, loop):
             caps = sample.get_caps()
             # Extract data from GStreamer buffer
             buf_size = buf.get_size()
-            buf_data = buf.extract_dup(0, buf_size)
+            buf_data = buf.extract_dup(0, buf_data)
             # Convert the data to a NumPy array
             try:
                 frame = np.frombuffer(buf_data, dtype=np.uint8)
                 frame = frame.reshape((240, 320,3))
                 global latest_frame
                 latest_frame = frame.copy() #Update global variable
-                print(latest_frame)  # In latest_frame để kiểm tra
+                #print(latest_frame)  # In latest_frame để kiểm tra
             except Exception as e:
                 print(f"Error processing GStreamer sample: {e}")
     elif t == Gst.MessageType.EOS:
