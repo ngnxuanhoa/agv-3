@@ -2,17 +2,45 @@
 <html>
 <head>
     <title>AGV Control</title>
+    <style>
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
     <h1>AGV Control Panel</h1>
     <img src="{{ url_for('video_feed') }}" alt="Live Video Stream">
     <br>
-    <form action="/control" method="post">
-        <input type="submit" name="command" value="forward">
-        <input type="submit" name="command" value="backward">
-        <input type="submit" name="command" value="left">
-        <input type="submit" name="command" value="right">
-        <input type="submit" name="command" value="stop">
-    </form>
+    <button onclick="sendCommand('forward')">Forward</button>
+    <button onclick="sendCommand('backward')">Backward</button>
+    <button onclick="sendCommand('left')">Left</button>
+    <button onclick="sendCommand('right')">Right</button>
+    <button onclick="sendCommand('stop')">Stop</button>
+
+    <script>
+        function sendCommand(command) {
+            fetch('/control', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'command=' + command
+            })
+            .then(response => {
+                if (response.ok) {
+                    console.log('Command sent successfully!');
+                } else {
+                    console.error('Failed to send command.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    </script>
 </body>
 </html>
