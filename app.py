@@ -18,7 +18,7 @@ IN1 = 22
 IN2 = 23
 IN3 = 24
 IN4 = 25
-
+GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(ENA, GPIO.OUT)
 GPIO.setup(ENB, GPIO.OUT)
