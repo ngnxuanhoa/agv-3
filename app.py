@@ -37,10 +37,11 @@ pipeline_str = (
     "v4l2src device=/dev/video0 ! "
     "videoconvert ! "
     "videoscale ! "
+    "videoconvert ! "  # Thêm videoconvert ở đây
     "image/jpeg,width=640,height=480,framerate=30/1 ! "
     "jpegenc ! "
     "rtpjpegpay ! "
-    "udpsink host=192.168.1.60 port=5000"  # Thay đổi IP để test
+    "udpsink host=192.168.1.60 port=5000"
 )
 # Initialize GStreamer
 Gst.init(None)
