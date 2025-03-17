@@ -3,72 +3,43 @@
 <head>
     <title>AGV Control</title>
     <style>
-        #videoCanvas {
-            border: 1px solid black;
+        body {
+            font-family: sans-serif;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        img {
+            max-width: 80%;
+            height: auto;
+            border: 1px solid #ccc;
         }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 </head>
 <body>
-    <h1>AGV Control</h1>
-    <div>
-        <canvas id="videoCanvas" width="640" height="480"></canvas>
-    </div>
-    <div>
-        <button id="forward">Forward</button>
-        <button id="backward">Backward</button>
-        <button id="left">Left</button>
-        <button id="right">Right</button>
-        <button id="stop">Stop</button>
-    </div>
-
+    <h1>AGV Control Panel</h1>
+    <img src="{{ url_for('video_feed') }}" alt="Live Video Feed">
+    <br>
+    <button onclick="move('forward')">Forward</button>
+    <button onclick="move('backward')">Backward</button>
+    <button onclick="move('left')">Left</button>
+    <button onclick="move('right')">Right</button>
+    <button onclick="move('stop')">Stop</button>
+    <br>
+    <button onclick="cleanup()">Cleanup GPIO</button>
     <script>
-        const socket = io();
-        const canvas = document.getElementById('videoCanvas');
-        const context = canvas.getContext('2d');
-        const img = new Image();
-
-        img.onload = () => {
-            context.drawImage(img, 0, 0);
-        };
-
-        img.src = "{{ url_for('video_feed') }}";
-
-        // Gửi lệnh điều khiển
-        document.getElementById('forward').addEventListener('click', () => {
-            socket.emit('control', 'forward');
-        });
-        document.getElementById('backward').addEventListener('click', () => {
-            socket.emit('control', 'backward');
-        });
-        document.getElementById('left').addEventListener('click', () => {
-            socket.emit('control', 'left');
-        });
-        document.getElementById('right').addEventListener('click', () => {
-            socket.emit('control', 'right');
-        });
-        document.getElementById('stop').addEventListener('click', () => {
-            socket.emit('control', 'stop');
-        });
-
-        // Xử lý click trên canvas (lấy tọa độ)
-        canvas.addEventListener('click', (event) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
-            console.log("Clicked at: x=" + x + ", y=" + y);
-
-            // Gửi tọa độ lên server
-            fetch('/map_click', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'x=' + x + '&y=' + y
-            });
-        });
-
-
+        function move(direction) {
+            fetch('/move/' + direction)
+                .then(response => console.log(response));
+        }
+        function cleanup() {
+            fetch('/cleanup')
+                .then(response => console.log(response));
+        }
     </script>
 </body>
 </html>
