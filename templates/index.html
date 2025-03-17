@@ -22,7 +22,7 @@
 </head>
 <body>
     <h1>AGV Control Panel</h1>
-    <img src="{{ url_for('video_feed') }}" alt="Live Video Feed">
+    <img src="http://YOUR_RASPBERRY_PI_IP_ADDRESS:8080/?action=stream" alt="Live Video Stream">
     <br>
     <button onclick="move('forward')">Forward</button>
     <button onclick="move('backward')">Backward</button>
@@ -30,12 +30,23 @@
     <button onclick="move('right')">Right</button>
     <button onclick="move('stop')">Stop</button>
     <br>
+    <button onclick="process()">Process Frame (QR/Obstacle)</button>
+    <br>
     <button onclick="cleanup()">Cleanup GPIO</button>
+
     <script>
         function move(direction) {
             fetch('/move/' + direction)
                 .then(response => console.log(response));
         }
+
+        function process() {
+            fetch('/process')
+                .then(response => response.text())
+                .then(data => alert(data)); // Display message from process route
+
+        }
+
         function cleanup() {
             fetch('/cleanup')
                 .then(response => console.log(response));
