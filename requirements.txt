@@ -1,5 +1,6 @@
 Flask
-Flask-SocketIO
-opencv-python-headless
-picamera2
+opencv-python
+numpy
 RPi.GPIO
+pyzba
+picamera2
