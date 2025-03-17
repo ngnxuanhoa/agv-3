@@ -22,7 +22,7 @@
 </head>
 <body>
     <h1>AGV Control Panel</h1>
-    <img src="http://YOUR_RASPBERRY_PI_IP_ADDRESS:8080/?action=stream" alt="Live Video Stream">
+    <img src="{{ url_for('video_feed') }}" alt="Live Video Stream">
     <br>
     <button onclick="move('forward')">Forward</button>
     <button onclick="move('backward')">Backward</button>
@@ -44,7 +44,6 @@
             fetch('/process')
                 .then(response => response.text())
                 .then(data => alert(data)); // Display message from process route
-
         }
 
         function cleanup() {
