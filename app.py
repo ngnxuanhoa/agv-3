@@ -41,7 +41,7 @@ pipeline_str = (
     "capsfilter caps=video/x-raw,format=YUY2,width=320,height=240,framerate=15/1 ! "  # Chỉ định định dạng và giảm độ phân giải
     "jpegenc ! "
     "rtpjpegpay ! "
-    "udpsink host=192.168.1.60 port=5000"  # Thay đổi IP
+    "udpsink host=192.168.1.100 port=5000"  # Thay đổi IP
 )
 
 # Initialize GStreamer
@@ -60,7 +60,7 @@ global latest_frame
 latest_frame = None
 
 # Haar Cascade Classifier (Ensure the path is correct)
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')  # Đảm bảo tệp này tồn tại
+#face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')  # Đảm bảo tệp này tồn tại
 
 # Motor Control Functions (same as before)
 def forward(speed):
@@ -102,6 +102,7 @@ target_coordinates = None
 
 # QR Code and Obstacle Detection
 def process_frame():
+    return None, None, False  # Tạm thời vô hiệu hóa
 
     global latest_frame
     if latest_frame is None:
@@ -135,15 +136,17 @@ def process_frame():
 
 def generate_frames():
     """Video streaming generator function."""
+    print("generate_frames called")  # Kiểm tra xem hàm này có được gọi hay không
     global latest_frame # Declare it's using the global frame
     while True:
         if latest_frame is not None:
-             ret, jpeg = cv2.imencode('.jpg', latest_frame)
-             if not ret:
-                 continue
-             frame = jpeg.tobytes()
-             yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            ret, jpeg = cv2.imencode('.jpg', latest_frame)
+            if not ret:
+                print("cv2.imencode failed")  # Kiểm tra xem mã hóa có thành công không
+                continue
+            frame = jpeg.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
         else:
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + b'' + b'\r\n') # Send an empty frame
@@ -169,6 +172,7 @@ def bus_call(bus, message, loop):
                 frame = frame.reshape((240, 320,3))
                 global latest_frame
                 latest_frame = frame.copy() #Update global variable
+                print(latest_frame)  # In latest_frame để kiểm tra
             except Exception as e:
                 print(f"Error processing GStreamer sample: {e}")
     elif t == Gst.MessageType.EOS:
@@ -216,28 +220,7 @@ def move_command(direction):
 
 @app.route('/process')
 def process():
-    global target_coordinates
-    frame, qr_data, obstacle_detected = process_frame()
-
-    if obstacle_detected:
-        stop()
-        return "Obstacle Detected!"
-
-    if qr_data:
-        try:
-            # Assuming QR code contains comma-separated coordinates (x, y)
-            x, y = map(int, qr_data.split(','))
-            target_coordinates = (x, y)  # Store the coordinates
-            # Implement basic pathfinding or movement logic here
-            print("Moving Towards coordinates:",target_coordinates)
-            forward(50) # Simple move forward
-            time.sleep(2)  # Move some distance
-            stop()
-            return f"Moving to coordinates ({x},{y})"
-        except ValueError:
-            return "Invalid QR code format. Coordinates should be 'x,y'."
-
-    return "No QR code detected."
+    return "Process tạm thời bị vô hiệu hóa"
 
 @app.route('/cleanup')
 def cleanup():
