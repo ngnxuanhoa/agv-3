@@ -39,7 +39,7 @@ pipeline_str = (
     "videoconvert ! "
     "jpegenc ! "
     "rtpjpegpay ! "
-    "udpsink host=192.168.1.60 port=5000"  # Thay đổi IP
+    "udpsink host=192.168.1.60 port=5000"  # ĐÃ THAY ĐỔI IP
 )
 
 # Initialize GStreamer
@@ -164,7 +164,7 @@ def bus_call(bus, message, loop):
             caps = sample.get_caps()
             # Extract data from GStreamer buffer
             buf_size = buf.get_size()
-            buf_data = buf.extract_dup(0, buf_data)
+            buf_data = buf.extract_dup(0, buf_size)
             # Convert the data to a NumPy array
             try:
                 frame = np.frombuffer(buf_data, dtype=np.uint8)
