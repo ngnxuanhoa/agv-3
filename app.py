@@ -39,7 +39,7 @@ pipeline_str = (
     "videoconvert ! "
     "jpegenc ! "
     "rtpjpegpay ! "
-    "udpsink host=192.168.1.100 port=5000"  # Thay đổi IP
+    "udpsink host=192.168.1.60 port=5000"  # Thay đổi IP
 )
 
 # Initialize GStreamer
