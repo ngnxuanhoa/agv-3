@@ -4,6 +4,7 @@ import numpy as np
 from picamera2 import Picamera2
 import RPi.GPIO as GPIO
 import time
+import pyzbar.pyzbar as pyzbar
 
 app = Flask(__name__)
 
@@ -50,11 +51,21 @@ def detect_obstacle(frame):
 
     return False, frame
 
+def decode_qr_code(frame):
+    """ Giải mã mã QR từ hình ảnh """
+    decoded_objects = pyzbar.decode(frame)
+    for obj in decoded_objects:
+        qr_data = obj.data.decode("utf-8")
+        print("QR Code data:", qr_data)
+        return qr_data
+    return None
+
 def generate_frames():
     """ Truyền hình ảnh đã xử lý đến trình duyệt """
     while True:
         frame = picam2.capture_array()
         obstacle_detected, processed_frame = detect_obstacle(frame)
+        qr_data = decode_qr_code(frame)
 
         _, buffer = cv2.imencode('.jpg', processed_frame)
         frame = buffer.tobytes()
