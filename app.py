@@ -38,7 +38,7 @@ pipeline_str = (
     "v4l2src device=/dev/video0 ! "
     "videoconvert ! "
     "videoscale ! "
-    "capsfilter caps=video/x-raw,format=I420 ! "  # Thêm capsfilter
+    "capsfilter caps=video/x-raw,format=I420,width=320,height=240,framerate=15/1 ! "  # Giảm độ phân giải và tốc độ khung hình
     "jpegenc ! "
     "rtpjpegpay ! "
     "udpsink host=192.168.1.100 port=5000"  # Thay đổi IP
@@ -169,7 +169,7 @@ def bus_call(bus, message, loop):
         err, debug = message.parse_error()
         print("Error: %s" % err, debug)
         loop.quit()
-    elif t == Gst.MessageType.NEW_BUFFER: # Sử dụng MESSAGE_NEW_BUFFER
+    elif t == Gst.MessageType.NEW_BUFFER:  # Sử dụng MESSAGE_NEW_BUFFER
         sample = message.get_structure().get_value('sample')
 
         buf = sample.get_buffer()
