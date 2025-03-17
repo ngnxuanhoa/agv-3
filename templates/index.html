@@ -2,20 +2,17 @@
 <html>
 <head>
     <title>AGV Control</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            text-align: center;
-        }
-        img {
-            max-width: 80%;
-            height: auto;
-            border: 1px solid #ccc;
-        }
-    </style>
 </head>
 <body>
     <h1>AGV Control Panel</h1>
     <img src="{{ url_for('video_feed') }}" alt="Live Video Stream">
+    <br>
+    <form action="/control" method="post">
+        <input type="submit" name="command" value="forward">
+        <input type="submit" name="command" value="backward">
+        <input type="submit" name="command" value="left">
+        <input type="submit" name="command" value="right">
+        <input type="submit" name="command" value="stop">
+    </form>
 </body>
 </html>
