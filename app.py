@@ -1,11 +1,13 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, Response
 import RPi.GPIO as GPIO
 import time
 import pyzbar.pyzbar as pyzbar
 import cv2
 import numpy as np
-from picamera2 import Picamera2
 import os
+import gi
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst, GLib
 
 app = Flask(__name__)
 
@@ -30,13 +32,30 @@ pwm_b = GPIO.PWM(ENB, 100)
 pwm_a.start(0)
 pwm_b.start(0)
 
-# Camera Setup using picamera2
-picam2 = Picamera2()
-picam2.configure(picam2.preview_configuration(main={"format": 'XRGB8888', "size": (640, 480)}))
-picam2.start()
+# GStreamer Pipeline
+pipeline_str = (
+    "libcamerasrc ! "
+    "videoconvert ! "
+    "videoscale ! "
+    "image/jpeg,width=640,height=480,framerate=30/1 ! "
+    "jpegenc ! "
+    "rtpjpegpay ! "
+    "udpsink host=127.0.0.1 port=5000"  # Replace with the IP of your computer to test locally first
+)
+# Initialize GStreamer
+Gst.init(None)
+pipeline = Gst.parse_launch(pipeline_str)
 
-# MJPG-Streamer Output File
-IMAGE_FILE = "/tmp/stream_image.jpg"
+# Check if pipeline was created successfully
+if pipeline is None:
+    print("Could not create pipeline. Check your pipeline string!")
+    exit()
+
+# Setting pipeline state to playing
+pipeline.set_state(Gst.State.PLAYING)
+# Define a global variable to store the latest frame
+global latest_frame
+latest_frame = None
 
 # Haar Cascade Classifier (Ensure the path is correct)
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -53,6 +72,7 @@ def forward(speed):
 def backward(speed):
     GPIO.output(IN1, GPIO.LOW)
     GPIO.output(IN2, GPIO.HIGH)
+    GPIO.output(IN3, GPIO.LOW)
     GPIO.output(IN3, GPIO.LOW)
     GPIO.output(IN4, GPIO.HIGH)
     pwm_a.ChangeDutyCycle(speed)
@@ -87,7 +107,12 @@ target_coordinates = None
 
 # QR Code and Obstacle Detection
 def process_frame():
-    frame = picam2.capture_array()
+
+    global latest_frame
+    if latest_frame is None:
+        return None, None, False # Return if no frame is available
+
+    frame = latest_frame.copy() # Make a copy to avoid modifying the original
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -101,6 +126,7 @@ def process_frame():
 
     # Obstacle Detection (Haar Cascade)
     obstacle_detected = False
+
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
     for (x, y, w, h) in faces:
@@ -109,16 +135,71 @@ def process_frame():
         print("Obstacle Detected")
         break
 
-    # Save the frame to a file for MJPG-streamer
-    cv2.imwrite(IMAGE_FILE, frame)
-
     # Return the qr_data and obstacle_detected flag
-    return qr_data, obstacle_detected
+    return frame, qr_data, obstacle_detected
+
+def generate_frames():
+    """Video streaming generator function."""
+    global latest_frame # Declare it's using the global frame
+    while True:
+        if latest_frame is not None:
+             ret, jpeg = cv2.imencode('.jpg', latest_frame)
+             if not ret:
+                 continue
+             frame = jpeg.tobytes()
+             yield (b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        else:
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + b'' + b'\r\n') # Send an empty frame
+        time.sleep(0.1)  # Adjust the sleep time to control the frame rate
+
+# Create a GStreamer bus to receive messages
+bus = pipeline.get_bus()
+
+# This function will be called when a new message arrives on the bus
+def bus_call(bus, message, loop):
+    t = message.type
+    if t == Gst.MessageType.EOS:
+        print("End-of-stream")
+        loop.quit()
+    elif t == Gst.MessageType.ERROR:
+        err, debug = message.parse_error()
+        print("Error: %s" % err, debug)
+        loop.quit()
+    elif t == Gst.MessageType.NEW_SAMPLE:
+        sample = message.get_structure().get_value('sample')
+
+        buf = sample.get_buffer()
+        caps = sample.get_caps()
+        # Extract data from GStreamer buffer
+        buf_size = buf.get_size()
+        buf_data = buf.extract_dup(0, buf_size)
+        # Convert the data to a NumPy array
+        try:
+            frame = np.frombuffer(buf_data, dtype=np.uint8)
+            frame = frame.reshape((480, 640,3))
+            global latest_frame
+            latest_frame = frame.copy() #Update global variable
+        except Exception as e:
+            print(f"Error processing GStreamer sample: {e}")
+    return True
+
+# Create a main loop to receive messages from the bus
+loop = GLib.MainLoop()
+
+# Add the bus_call function to the bus to be called for each message
+bus.add_signal_watch()
+bus.connect("message", bus_call, loop)
 
 # Flask Routes
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/move/<direction>')
 def move_command(direction):
@@ -140,7 +221,7 @@ def move_command(direction):
 @app.route('/process')
 def process():
     global target_coordinates
-    qr_data, obstacle_detected = process_frame()
+    frame, qr_data, obstacle_detected = process_frame()
 
     if obstacle_detected:
         stop()
@@ -169,12 +250,13 @@ def cleanup():
 
 if __name__ == '__main__':
     try:
-        # Start MJPG-streamer in a separate process
-        # Replace with your actual mjpg_streamer command
-        os.system(f"mjpg_streamer -i '/usr/lib/mjpg-streamer/input_file.so -f {IMAGE_FILE} -n' -o '/usr/lib/mjpg-streamer/output_http.so -w /usr/share/mjpg-streamer/www -p 8080'")
+        #Create a thread to start gstreamer loop.
+        import threading
+        gst_thread = threading.Thread(target=loop.run)
+        gst_thread.start()
 
         app.run(host='0.0.0.0', port=5000, debug=True)
     finally:
+        # Stop GStreamer pipeline
+        pipeline.set_state(Gst.State.NULL)
         GPIO.cleanup()
-        picam2.close()
-        # Kill mjpg_streamer process here (implementation depends on how it's started)
