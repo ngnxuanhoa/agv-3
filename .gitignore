@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+*.log
+*.jpg  # Nếu bạn không muốn commit các ảnh test
+*.h264 # Nếu bạn không muốn commit các video test

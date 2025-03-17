@@ -1,0 +1,5 @@
+Flask
+Flask-SocketIO
+opencv-python-headless
+picamera2
+RPi.GPIO
