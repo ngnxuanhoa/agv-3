@@ -37,11 +37,10 @@ pwm_b.start(0)
 pipeline_str = (
     "v4l2src device=/dev/video0 ! "
     "videoconvert ! "
-    "videoscale ! "
-    "capsfilter caps=video/x-raw,format=I420,width=320,height=240,framerate=15/1 ! "  # Giảm độ phân giải và tốc độ khung hình
+    "capsfilter caps=video/x-raw,format=YUY2,width=320,height=240,framerate=15/1 ! "  # Chỉ định định dạng và giảm độ phân giải
     "jpegenc ! "
     "rtpjpegpay ! "
-    "udpsink host=192.168.1.100 port=5000"  # Thay đổi IP
+    "udpsink host=192.168.1.60 port=5000"  # Thay đổi IP
 )
 
 # Initialize GStreamer
@@ -81,14 +80,6 @@ def backward(speed):
     pwm_b.ChangeDutyCycle(speed)
 
 def left(speed):
-    GPIO.output(IN1, GPIO.LOW)
-    GPIO.output(IN2, GPIO.LOW)
-    GPIO.output(IN3, GPIO.HIGH)
-    GPIO.output(IN4, GPIO.LOW)
-    pwm_a.ChangeDutyCycle(0)
-    pwm_b.ChangeDutyCycle(speed)
-
-def right(speed):
     GPIO.output(IN1, GPIO.HIGH)
     GPIO.output(IN2, GPIO.LOW)
     GPIO.output(IN3, GPIO.LOW)
@@ -99,10 +90,19 @@ def right(speed):
 def stop():
     GPIO.output(IN1, GPIO.LOW)
     GPIO.output(IN2, GPIO.LOW)
-    GPIO.output(IN3, GPIO.LOW)
+    GPIO.output(IN3, GPIO.HIGH)
     GPIO.output(IN4, GPIO.LOW)
     pwm_a.ChangeDutyCycle(0)
-    pwm_b.ChangeDutyCycle(0)
+    pwm_b = GPIO.PWM(ENB, 100)
+pwm_b.start(0)
+def right(speed):
+    GPIO.output(IN1, GPIO.LOW)
+    GPIO.output(IN2, GPIO.HIGH)
+    GPIO.output(IN3, GPIO.LOW)
+    GPIO.output(IN4, GPIO.HIGH)
+    pwm_a.ChangeDutyCycle(speed)
+    pwm_b = GPIO.PWM(ENB, 100)
+pwm_b.start(0)
 
 # Global variable to store target coordinates
 target_coordinates = None
@@ -180,7 +180,7 @@ def bus_call(bus, message, loop):
         # Convert the data to a NumPy array
         try:
             frame = np.frombuffer(buf_data, dtype=np.uint8)
-            frame = frame.reshape((480, 640,3))
+            frame = frame.reshape((240, 320,3))
             global latest_frame
             latest_frame = frame.copy() #Update global variable
         except Exception as e:
