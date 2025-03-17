@@ -18,7 +18,8 @@ IN1 = 22
 IN2 = 23
 IN3 = 24
 IN4 = 25
-GPIO.setwarnings(False)
+
+GPIO.setwarnings(False)  # Tắt cảnh báo GPIO
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(ENA, GPIO.OUT)
 GPIO.setup(ENB, GPIO.OUT)
@@ -37,12 +38,12 @@ pipeline_str = (
     "v4l2src device=/dev/video0 ! "
     "videoconvert ! "
     "videoscale ! "
-    "videoconvert ! "  # Thêm videoconvert ở đây
-    "image/jpeg,width=640,height=480,framerate=30/1 ! "
+    "capsfilter caps=video/x-raw,format=I420 ! "  # Thêm capsfilter
     "jpegenc ! "
     "rtpjpegpay ! "
-    "udpsink host=192.168.1.60 port=5000"
+    "udpsink host=192.168.1.100 port=5000"  # Thay đổi IP
 )
+
 # Initialize GStreamer
 Gst.init(None)
 pipeline = Gst.parse_launch(pipeline_str)
