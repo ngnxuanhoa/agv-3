@@ -34,13 +34,13 @@ pwm_b.start(0)
 
 # GStreamer Pipeline
 pipeline_str = (
-    "libcamerasrc ! "
+    "v4l2src device=/dev/video0 ! "
     "videoconvert ! "
     "videoscale ! "
     "image/jpeg,width=640,height=480,framerate=30/1 ! "
     "jpegenc ! "
     "rtpjpegpay ! "
-    "udpsink host=192.168.1.60 port=5000"  # Replace with the IP of your computer to test locally first
+    "udpsink host=192.168.1.60 port=5000"  # Thay đổi IP để test
 )
 # Initialize GStreamer
 Gst.init(None)
