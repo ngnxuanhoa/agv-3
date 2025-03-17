@@ -155,14 +155,7 @@ bus = pipeline.get_bus()
 # This function will be called when a new message arrives on the bus
 def bus_call(bus, message, loop):
     t = message.type
-    if t == Gst.MessageType.EOS:
-        print("End-of-stream")
-        loop.quit()
-    elif t == Gst.MessageType.ERROR:
-        err, debug = message.parse_error()
-        print("Error: %s" % err, debug)
-        loop.quit()
-    elif message.type == Gst.MessageType.NEW_BUFFER or message.type == Gst.MessageType.NEW_SAMPLE:
+    if message.get_structure():  # Kiểm tra xem message có chứa structure hay không
         sample = message.get_structure().get_value('sample')
         if sample is not None:
             buf = sample.get_buffer()
@@ -178,8 +171,16 @@ def bus_call(bus, message, loop):
                 latest_frame = frame.copy() #Update global variable
             except Exception as e:
                 print(f"Error processing GStreamer sample: {e}")
+    elif t == Gst.MessageType.EOS:
+        print("End-of-stream")
+        loop.quit()
+    elif t == Gst.MessageType.ERROR:
+        err, debug = message.parse_error()
+        print("Error: %s" % err, debug)
+        loop.quit()
 
     return True
+
 # Create a main loop to receive messages from the bus
 loop = GLib.MainLoop()
 
