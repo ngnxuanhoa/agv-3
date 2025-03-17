@@ -60,7 +60,7 @@ global latest_frame
 latest_frame = None
 
 # Haar Cascade Classifier (Ensure the path is correct)
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')  # Đảm bảo tệp này tồn tại
 
 # Motor Control Functions (same as before)
 def forward(speed):
@@ -169,7 +169,7 @@ def bus_call(bus, message, loop):
         err, debug = message.parse_error()
         print("Error: %s" % err, debug)
         loop.quit()
-    elif t == Gst.MessageType.NEW_SAMPLE:
+    elif t == Gst.MessageType.NEW_BUFFER: # Sử dụng MESSAGE_NEW_BUFFER
         sample = message.get_structure().get_value('sample')
 
         buf = sample.get_buffer()
