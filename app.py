@@ -2,7 +2,10 @@ from flask import Flask, render_template, Response, request
 import cv2
 import RPi.GPIO as GPIO
 import time
-import pyzbar.pyzbar as pyzbar  # Import pyzbar
+import pyzbar.pyzbar as pyzbar
+from picamera2 import Picamera2
+import io
+import numpy as np
 
 app = Flask(__name__)
 
@@ -27,8 +30,10 @@ pwm_b = GPIO.PWM(ENB, 100)
 pwm_a.start(0)
 pwm_b.start(0)
 
-# Camera Setup
-camera = cv2.VideoCapture(0)
+# Camera Setup using picamera2
+picam2 = Picamera2()
+picam2.configure(picam2.preview_configuration(main={"format": 'XRGB8888', "size": (640, 480)}))
+picam2.start()
 
 # Haar Cascade Classifier (Ensure the path is correct)
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -94,10 +99,9 @@ def decode(image):
 # Frame Generator for Video Stream
 def generate_frames():
     while True:
-        success, frame = camera.read()
-        if not success:
-            break
-        else:
+        try:
+            frame = picam2.capture_array()
+
             obstacle_detected = detect_obstacles(frame)
             if obstacle_detected:
                 print("Obstacle detected! Stopping...")
@@ -107,12 +111,15 @@ def generate_frames():
             if qr_data:
                 print("QR Code data:", qr_data)
                 # Add your logic here to process the QR code data
-                # e.g., update target coordinates, adjust path
 
+            # Convert NumPy array to JPEG
             ret, buffer = cv2.imencode('.jpg', frame)
             frame = buffer.tobytes()
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        except Exception as e:
+            print(f"Error in generate_frames: {e}")
+            break
 
 # Flask Routes
 @app.route('/')
@@ -151,3 +158,4 @@ if __name__ == '__main__':
         app.run(host='0.0.0.0', port=5000, debug=True)
     finally:
         GPIO.cleanup()  # Ensure GPIO cleanup on exit
+        picam2.close()   # Close the camera
