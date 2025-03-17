@@ -37,6 +37,7 @@ pwm_b.start(0)
 pipeline_str = (
     "v4l2src device=/dev/video0 ! "
     "videoconvert ! "
+    "videoscale ! "
     "capsfilter caps=video/x-raw,format=YUY2,width=320,height=240,framerate=15/1 ! "  # Chỉ định định dạng và giảm độ phân giải
     "jpegenc ! "
     "rtpjpegpay ! "
@@ -85,14 +86,6 @@ def left(speed):
     GPIO.output(IN3, GPIO.LOW)
     GPIO.output(IN4, GPIO.LOW)
     pwm_a.ChangeDutyCycle(speed)
-    pwm_b.ChangeDutyCycle(0)
-
-def stop():
-    GPIO.output(IN1, GPIO.LOW)
-    GPIO.output(IN2, GPIO.LOW)
-    GPIO.output(IN3, GPIO.HIGH)
-    GPIO.output(IN4, GPIO.LOW)
-    pwm_a.ChangeDutyCycle(0)
     pwm_b = GPIO.PWM(ENB, 100)
 pwm_b.start(0)
 def right(speed):
@@ -169,24 +162,24 @@ def bus_call(bus, message, loop):
         err, debug = message.parse_error()
         print("Error: %s" % err, debug)
         loop.quit()
-    elif t == Gst.MessageType.NEW_BUFFER:  # Sử dụng MESSAGE_NEW_BUFFER
+    elif message.type == Gst.MessageType.NEW_BUFFER or message.type == Gst.MessageType.NEW_SAMPLE:
         sample = message.get_structure().get_value('sample')
+        if sample is not None:
+            buf = sample.get_buffer()
+            caps = sample.get_caps()
+            # Extract data from GStreamer buffer
+            buf_size = buf.get_size()
+            buf_data = buf.extract_dup(0, buf_size)
+            # Convert the data to a NumPy array
+            try:
+                frame = np.frombuffer(buf_data, dtype=np.uint8)
+                frame = frame.reshape((240, 320,3))
+                global latest_frame
+                latest_frame = frame.copy() #Update global variable
+            except Exception as e:
+                print(f"Error processing GStreamer sample: {e}")
 
-        buf = sample.get_buffer()
-        caps = sample.get_caps()
-        # Extract data from GStreamer buffer
-        buf_size = buf.get_size()
-        buf_data = buf.extract_dup(0, buf_size)
-        # Convert the data to a NumPy array
-        try:
-            frame = np.frombuffer(buf_data, dtype=np.uint8)
-            frame = frame.reshape((240, 320,3))
-            global latest_frame
-            latest_frame = frame.copy() #Update global variable
-        except Exception as e:
-            print(f"Error processing GStreamer sample: {e}")
     return True
-
 # Create a main loop to receive messages from the bus
 loop = GLib.MainLoop()
 
