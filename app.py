@@ -1,11 +1,11 @@
-from flask import Flask, render_template, Response, request
-import cv2
+from flask import Flask, render_template, request
 import RPi.GPIO as GPIO
 import time
 import pyzbar.pyzbar as pyzbar
-from picamera2 import Picamera2
-import io
+import cv2
 import numpy as np
+from picamera2 import Picamera2
+import os
 
 app = Flask(__name__)
 
@@ -35,10 +35,13 @@ picam2 = Picamera2()
 picam2.configure(picam2.preview_configuration(main={"format": 'XRGB8888', "size": (640, 480)}))
 picam2.start()
 
+# MJPG-Streamer Output File
+IMAGE_FILE = "/tmp/stream_image.jpg"
+
 # Haar Cascade Classifier (Ensure the path is correct)
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
-# Motor Control Functions
+# Motor Control Functions (same as before)
 def forward(speed):
     GPIO.output(IN1, GPIO.HIGH)
     GPIO.output(IN2, GPIO.LOW)
@@ -79,56 +82,43 @@ def stop():
     pwm_a.ChangeDutyCycle(0)
     pwm_b.ChangeDutyCycle(0)
 
-# Obstacle Detection Function
-def detect_obstacles(frame):
+# Global variable to store target coordinates
+target_coordinates = None
+
+# QR Code and Obstacle Detection
+def process_frame():
+    frame = picam2.capture_array()
+
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # QR Code Decoding
+    qr_data = None
+    decoded_objects = pyzbar.decode(gray)
+    for obj in decoded_objects:
+        qr_data = obj.data.decode("utf-8")
+        print("QR Code data:", qr_data)
+        break
+
+    # Obstacle Detection (Haar Cascade)
+    obstacle_detected = False
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+
     for (x, y, w, h) in faces:
         cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-        return True
-    return False
+        obstacle_detected = True
+        print("Obstacle Detected")
+        break
 
-# QR Code Decoding Function
-def decode(image):
-    decoded_objects = pyzbar.decode(image)
-    for obj in decoded_objects:
-        print("Data:", obj.data.decode("utf-8"))
-        return obj.data.decode("utf-8")  # Return the decoded data
-    return None
+    # Save the frame to a file for MJPG-streamer
+    cv2.imwrite(IMAGE_FILE, frame)
 
-# Frame Generator for Video Stream
-def generate_frames():
-    while True:
-        try:
-            frame = picam2.capture_array()
-
-            obstacle_detected = detect_obstacles(frame)
-            if obstacle_detected:
-                print("Obstacle detected! Stopping...")
-                stop()
-
-            qr_data = decode(frame)
-            if qr_data:
-                print("QR Code data:", qr_data)
-                # Add your logic here to process the QR code data
-
-            # Convert NumPy array to JPEG
-            ret, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-        except Exception as e:
-            print(f"Error in generate_frames: {e}")
-            break
+    # Return the qr_data and obstacle_detected flag
+    return qr_data, obstacle_detected
 
 # Flask Routes
 @app.route('/')
 def index():
     return render_template('index.html')
-
-@app.route('/video_feed')
-def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/move/<direction>')
 def move_command(direction):
@@ -147,15 +137,44 @@ def move_command(direction):
         return "Invalid command", 400
     return "OK"
 
+@app.route('/process')
+def process():
+    global target_coordinates
+    qr_data, obstacle_detected = process_frame()
+
+    if obstacle_detected:
+        stop()
+        return "Obstacle Detected!"
+
+    if qr_data:
+        try:
+            # Assuming QR code contains comma-separated coordinates (x, y)
+            x, y = map(int, qr_data.split(','))
+            target_coordinates = (x, y)  # Store the coordinates
+            # Implement basic pathfinding or movement logic here
+            print("Moving Towards coordinates:",target_coordinates)
+            forward(50) # Simple move forward
+            time.sleep(2)  # Move some distance
+            stop()
+            return f"Moving to coordinates ({x},{y})"
+        except ValueError:
+            return "Invalid QR code format. Coordinates should be 'x,y'."
+
+    return "No QR code detected."
+
 @app.route('/cleanup')
 def cleanup():
     GPIO.cleanup()
     return "GPIO Cleaned Up"
 
-
 if __name__ == '__main__':
     try:
+        # Start MJPG-streamer in a separate process
+        # Replace with your actual mjpg_streamer command
+        os.system(f"mjpg_streamer -i '/usr/lib/mjpg-streamer/input_file.so -f {IMAGE_FILE} -n' -o '/usr/lib/mjpg-streamer/output_http.so -w /usr/share/mjpg-streamer/www -p 8080'")
+
         app.run(host='0.0.0.0', port=5000, debug=True)
     finally:
-        GPIO.cleanup()  # Ensure GPIO cleanup on exit
-        picam2.close()   # Close the camera
+        GPIO.cleanup()
+        picam2.close()
+        # Kill mjpg_streamer process here (implementation depends on how it's started)
